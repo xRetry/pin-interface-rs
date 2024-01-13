@@ -1,13 +1,30 @@
 use anyhow::{Result, anyhow};
 
+struct Peripherals {
+
+}
+
+impl Peripherals {
+    pub fn init(&mut self) {
+
+    }
+
+    pub fn read(&self) {
+
+    }
+}
+
+type FnInit = Box<dyn FnMut(i32) -> Result<()>>;
+type FnExec = Box<dyn Fn(i32) -> Result<f64>>;
+
 struct PinOp {
-    fn_init: fn(i32) -> Result<()>,
-    fn_op: fn(i32) -> Result<f64>,
+    fn_init: FnInit,
+    fn_op: FnExec,
     allowed: Vec<i32>,
 }
 
 impl PinOp {
-    fn new(fn_init: fn(i32) -> Result<()>, fn_op: fn(i32) -> Result<f64>, allowed: Vec<i32>) -> Self {
+    fn new(fn_init: FnInit, fn_op: FnExec, allowed: Vec<i32>) -> Self {
         return PinOp{
             fn_init,
             fn_op,
@@ -16,14 +33,17 @@ impl PinOp {
     }
 }
 
-struct PinInterface {
+struct PinInterface<'a> {
     pin_ops: Vec<PinOp>,
-    active: Vec<fn(i32) -> Result<f64>>,
+    active: Vec<&'a FnExec>,
 }
 
-impl PinInterface {
+impl<'a> PinInterface<'a> {
     pub fn new(pin_ops: Vec<PinOp>) -> Self {
-        let active: Vec<fn(i32) -> Result<f64>> = vec![disabled; 10];
+        let mut active: Vec<&FnExec> = Vec::new();
+        for _ in 0..10 {
+            active.push(&pin_ops[0].fn_op);
+        }
         return Self{
             pin_ops,
             active
@@ -39,7 +59,7 @@ impl PinInterface {
     }
 
     pub fn init_op(&mut self, pin_nr: i32, op_nr: i32) -> Result<()> {
-        let Some(pin_op) = self.pin_ops.get(op_nr as usize) else {
+        let Some(pin_op) = self.pin_ops.get_mut(op_nr as usize) else {
             return Err(anyhow!("Invalid op number"));
         };
 
@@ -48,7 +68,7 @@ impl PinInterface {
         }
 
         (pin_op.fn_init)(pin_nr)?;
-        self.active[pin_nr as usize] = pin_op.fn_op;
+        self.active[pin_nr as usize] = &pin_op.fn_op;
 
         return Ok(());
     }
@@ -67,7 +87,20 @@ fn digital_read(pin_nr: i32) -> Result<f64> {
 }
 
 fn main() {
+    let mut per = Peripherals{};
+
+    let fn_init_digital_read = |_: i32| {
+        per.init();
+        Ok(())
+    };
+
+    let fn_digital_read = |_: i32| {
+        per.read();
+        let ret: f64 = 10.;
+        return Ok(ret);
+    };
+
     let interface = PinInterface::new(
-        vec![PinOp::new(init_digital_read, digital_read, vec![1, 2, 3, 10])],
+        vec![PinOp::new(Box::new(fn_init_digital_read), Box::new(fn_digital_read), vec![1, 2, 3, 10])],
     );
 }
