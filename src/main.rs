@@ -23,7 +23,7 @@ struct PinInterface {
 
 impl PinInterface {
     pub fn new(pin_ops: Vec<PinOp>) -> Self {
-        let active = vec![disabled; 10];
+        let active: Vec<fn(i32) -> Result<f64>> = vec![disabled; 10];
         return Self{
             pin_ops,
             active
@@ -38,7 +38,7 @@ impl PinInterface {
         return fn_op(pin_nr);
     }
 
-    pub fn init_op(&self, pin_nr: i32, op_nr: i32) -> Result<()> {
+    pub fn init_op(&mut self, pin_nr: i32, op_nr: i32) -> Result<()> {
         let Some(pin_op) = self.pin_ops.get(op_nr as usize) else {
             return Err(anyhow!("Invalid op number"));
         };
